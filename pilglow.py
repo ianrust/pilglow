@@ -1,17 +1,20 @@
+import Adafruit_MPR121.MPR121 as MPR121
 import cv2
 import itertools
 import math
 import random
 import numpy as np
+import sys
 
-X_RES = 3840/10
-Y_RES = 2160/10
-NUM_X = 7
-NUM_Y = 5
+X_RES = 192
+Y_RES = 108
+NUM_X = 8
+NUM_Y = 4
 COV_MULT = 0.1
 
-DEBUG_TOUCH = True
+DEBUG_TOUCH = False
 DEBUG_IMAGE = False
+DEBUG_CENTERS = True
 
 EMPTY_TOUCH_STATE = [0,0,0,0,0,0,0,0,0,0,0,0]
 
@@ -44,15 +47,15 @@ class Position:
 
     def update(self, cap_state):
         update_val = 0
-        if cap_state[self.vert_index] and cap_state[self.horiz_index]:
+        if cap_state[self.vert_index] or cap_state[self.horiz_index]:
             self.on = True
             update_val = 1
         else:
             self.off = False
             update_val = -1
 
-        # add random position if there are no more than 100 point
-        if (len(self.vertices) < 50):
+        # add random position if there are no more than 5 point
+        if (len(self.vertices) < 5):
             self.vertices.append(self.getRandomVertex())
 
         # inefficient copy version, but safer
@@ -101,8 +104,8 @@ class ScreenState:
         # draw a circle on every vertex w/ a size proportional to it's age
         poly_points = []
         for p in self.positions:
-            if (DEBUG_IMAGE):
-                cv2.circle(screen, (int(p.x), int(p.y)), 10, self.color, -1)
+            if (DEBUG_CENTERS):
+                cv2.circle(screen, (int(p.x), int(p.y)), 1, self.color, -1)
             for v in p.vertices:
                 cv2.circle(screen, (v.x, v.y), v.age*10, self.color, -1)
                 poly_points.append([v.x,v.y])
@@ -117,6 +120,13 @@ class PolyPillowEmoter:
         self.state = ScreenState()
         self.mouse_touch_state = list(EMPTY_TOUCH_STATE)
         self.mouse_down = False
+        # Create MPR121 instance.
+        self.cap = MPR121.MPR121()
+        
+        # Initialize communication with MPR121 using default I2C bus of device 
+        if not self.cap.begin():
+            print 'Error initializing MPR121.  Check your wiring!'
+            sys.exit(1)
 
     def mouseCallback(self, event, x, y, flags, param):
         if (event == cv2.EVENT_LBUTTONUP):
@@ -142,8 +152,13 @@ class PolyPillowEmoter:
         if (DEBUG_TOUCH): #use mouse
             return self.mouse_touch_state
         else: #use MPR121
-            # TODO
-            return [0,0,0,0,0,0,0,0,0,0,0,0] # dummy data
+            current_pins_touched = self.cap.touched()
+            cap_touched = list(EMPTY_TOUCH_STATE)
+            for i in range(12):
+                pin_bit = 1 << i
+                if (current_pins_touched & pin_bit):
+                    cap_touched[i] = 1
+            return cap_touched
 
     def updatePolygons(self, touch_state):
         self.state.updatePositions(touch_state)
@@ -154,7 +169,7 @@ class PolyPillowEmoter:
     def show(self):
         img = self.state.renderScreen()
         cv2.imshow(IMAGE_NAME,img)
-        cv2.waitKey(1)
+        cv2.waitKey(200)
 
     def run(self):
         if (DEBUG_IMAGE):
