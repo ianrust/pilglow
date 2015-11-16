@@ -12,8 +12,8 @@ NUM_X = 8
 NUM_Y = 4
 COV_MULT = 0.1
 
-DEBUG_TOUCH = True
-DEBUG_IMAGE = True
+DEBUG_TOUCH = False
+DEBUG_IMAGE = False
 DEBUG_CENTERS = False
 
 EMPTY_TOUCH_STATE = [0,0,0,0,0,0,0,0,0,0,0,0]
@@ -78,6 +78,9 @@ class ScreenState:
     def __init__(self):
         self.positions = self.createPositions()
         self.color = (0,0,255)
+        self.edge_pos = (0,0)
+        self.edge_direction = (1,0)
+        self.color_bkgnd = np.zeros((Y_RES, X_RES, 3), np.uint8)
 
     def createPositions(self,
                         x_width = X_RES,
@@ -96,24 +99,46 @@ class ScreenState:
         # got through positions and update them
         map (lambda p : p.update(touch_state), self.positions)
 
-    def setColor(self, bgr):
-        self.color = bgr
-
     def renderScreen(self):
-        screen = np.zeros((Y_RES, X_RES, 3), np.uint8)
+        screen = np.zeros((Y_RES, X_RES,3), np.uint8)
         # draw a circle on every vertex w/ a size proportional to it's age
         poly_points = []
         for p in self.positions:
             if (DEBUG_CENTERS):
-                cv2.circle(screen, (int(p.x), int(p.y)), 1, self.color, -1)
+                cv2.circle(screen, (int(p.x), int(p.y)), 1, (255,255,255), -1)
             for v in p.vertices:
-                cv2.circle(screen, (v.x, v.y), v.age*10, self.color, -1)
+                cv2.circle(screen, (v.x, v.y), v.age*10, (255,255,255), -1)
                 poly_points.append([v.x,v.y])
         # also draw some polygons
         if len(poly_points) > 1:
-            cv2.fillPoly(screen, [np.array(poly_points)], self.color)
+            cv2.fillPoly(screen, [np.array(poly_points)], (255,255,255))
 
-        return screen
+        return cv2.bitwise_and(screen,self.color_bkgnd)
+
+    def updateBackground(self):
+        # rotate pos
+        self.edge_pos = (self.edge_pos[0] + self.edge_direction[0],
+                        self.edge_pos[1] + self.edge_direction[1])
+
+        if (self.edge_pos == (X_RES,0)):
+            self.edge_direction = (0,1)
+        elif (self.edge_pos == (X_RES,Y_RES)):
+            self.edge_direction = (-1,0)
+        elif (self.edge_pos == (0,Y_RES)):
+            self.edge_direction = (0,-1)
+        elif (self.edge_pos == (0,0)):
+            self.edge_direction = (1,0)
+
+        other_pos = (X_RES - self.edge_pos[0], Y_RES - self.edge_pos[1])
+        self.color_bkgnd = np.zeros((Y_RES, X_RES, 3), np.uint8)
+
+        self.color_bkgnd[:,:,0].fill(255)
+        self.color_bkgnd[:,:,1].fill(212)
+        self.color_bkgnd[:,:,2].fill(128)
+
+        cv2.circle(self.color_bkgnd, self.edge_pos, 70, (20*2,86*2,252*2), -1)
+        cv2.circle(self.color_bkgnd, other_pos, 70, (255*2,64*2,233*2), -1)
+        self.color_bkgnd = cv2.GaussianBlur(self.color_bkgnd, (101,101), 20)
 
 class PolyPillowEmoter:
 
@@ -165,13 +190,13 @@ class PolyPillowEmoter:
     def updatePolygons(self, touch_state):
         self.state.updatePositions(touch_state)
 
-    def adjustColors(self):
-        self.state.setColor((0,0,255))
-
     def show(self):
         img = self.state.renderScreen()
         cv2.imshow(IMAGE_NAME,img)
-        cv2.waitKey(200)
+        cv2.waitKey(10)
+
+    def adjustColors(self):
+        self.state.updateBackground()
 
     def run(self):
         if (DEBUG_IMAGE):
