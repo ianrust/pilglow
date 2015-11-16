@@ -12,9 +12,9 @@ NUM_X = 8
 NUM_Y = 4
 COV_MULT = 0.1
 
-DEBUG_TOUCH = False
-DEBUG_IMAGE = False
-DEBUG_CENTERS = True
+DEBUG_TOUCH = True
+DEBUG_IMAGE = True
+DEBUG_CENTERS = False
 
 EMPTY_TOUCH_STATE = [0,0,0,0,0,0,0,0,0,0,0,0]
 
@@ -121,13 +121,14 @@ class PolyPillowEmoter:
         self.state = ScreenState()
         self.mouse_touch_state = list(EMPTY_TOUCH_STATE)
         self.mouse_down = False
-        # Create MPR121 instance.
-        self.cap = MPR121.MPR121()
-        
-        # Initialize communication with MPR121 using default I2C bus of device 
-        if not self.cap.begin():
-            print 'Error initializing MPR121.  Check your wiring!'
-            sys.exit(1)
+        if (not DEBUG_TOUCH):
+            # Create MPR121 instance.
+            self.cap = MPR121.MPR121()
+            
+            # Initialize communication with MPR121 using default I2C bus of device 
+            if not self.cap.begin():
+                print 'Error initializing MPR121.  Check your wiring!'
+                sys.exit(1)
 
     def mouseCallback(self, event, x, y, flags, param):
         if (event == cv2.EVENT_LBUTTONUP):
