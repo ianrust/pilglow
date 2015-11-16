@@ -29,7 +29,7 @@ class Vertex:
 
     def advanceAge(self, amount = 1):
         self.age += amount
-        self.age = max(0, self.age)
+        self.age = min(50,max(0, self.age))
 
     def alive(self):
         return (self.age > 0)
@@ -47,7 +47,7 @@ class Position:
 
     def update(self, cap_state):
         update_val = 0
-        if cap_state[self.vert_index] or cap_state[self.horiz_index]:
+        if cap_state[self.vert_index] and cap_state[self.horiz_index]:
             self.on = True
             update_val = 1
         else:
@@ -109,6 +109,7 @@ class ScreenState:
             for v in p.vertices:
                 cv2.circle(screen, (v.x, v.y), v.age*10, self.color, -1)
                 poly_points.append([v.x,v.y])
+        # also draw some polygons
         if len(poly_points) > 1:
             cv2.fillPoly(screen, [np.array(poly_points)], self.color)
 
